@@ -1,0 +1,720 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Симуляция слотов — эксперимент</title>
+  <style>
+    body{
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 900px;
+      margin: 0 auto;
+      line-height: 1.5;
+    }
+    h1,h2,h3{
+      margin-top: 0;
+    }
+    .screen{
+      display: none;
+    }
+    .screen.active{
+      display: block;
+    }
+    #balance{
+      font-weight: bold;
+    }
+    .controls{
+      margin-top: 10px;
+    }
+    .controls input[type="number"]{
+      width: 80px;
+    }
+    #message{
+      margin-top: 10px;
+      min-height: 24px;
+    }
+    .info-bar{
+      margin-top: 10px;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    .label{
+      font-weight: bold;
+    }
+    button{
+      padding: 6px 14px;
+      margin-top: 8px;
+      cursor: pointer;
+      border-radius: 4px;
+      border: 1px solid #888;
+      background: #f0f0f0;
+    }
+    button:disabled{
+      opacity: 0.6;
+      cursor: default;
+    }
+    /* Красная кнопка старта/спина */
+    .btn-primary{
+      background: #d60000;
+      color: #ffffff;
+      border-color: #a00000;
+      font-weight: bold;
+    }
+    .small{
+      font-size: 13px;
+      color: #555;
+    }
+    .muted{
+      color: #777;
+    }
+    .error{
+      color: #b00020;
+      font-size: 13px;
+      margin-top: 4px;
+    }
+    .success{
+      color: #006400;
+    }
+
+    /* Визуализация слотов */
+    #slotContainer{
+      margin-top: 15px;
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      align-items: center;
+    }
+    .reel{
+      width: 80px;
+      height: 80px;
+      border-radius: 8px;
+      border: 2px solid #444;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      background: #fdfdfd;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    }
+    #slotFrame{
+      padding: 10px 16px;
+      border-radius: 10px;
+      border: 2px solid #ccc;
+      background: linear-gradient(135deg, #fafafa, #f0f0f0);
+      margin-top: 10px;
+    }
+    .scale-block{
+      margin-bottom: 18px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: #fafafa;
+    }
+    .scale-block h4{
+      margin: 0 0 8px;
+    }
+    .question{
+      margin-bottom: 6px;
+    }
+    .question label{
+      display: block;
+      margin-bottom: 2px;
+    }
+    select, input[type="number"], input[type="text"]{
+      padding: 4px 6px;
+      border-radius: 4px;
+      border: 1px solid #aaa;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Экран 1: ввод участника + общая инфа -->
+  <div id="screen-intro" class="screen active">
+    <h1>Симулированная игра «слоты»</h1>
+    <p>
+      В этом задании вы будете играть в простую симуляцию слотов с виртуальными баллами.
+      Денег в эксперименте нет, все выигрыши и проигрыши — условные.
+    </p>
+
+    <h3>Перед началом</h3>
+    <p>
+      Пожалуйста, введите ваш <strong>идентификатор участника</strong> (код, который вы получили от исследователя).
+      Если кода нет, вы можете ввести свои инициалы или любой условный ID.
+    </p>
+
+    <label>
+      Идентификатор участника:
+      <input type="text" id="participantIdInput" placeholder="например, P001">
+    </label>
+    <div id="introError" class="error"></div>
+
+    <h3>Краткая инструкция</h3>
+    <ul>
+      <li>Стартовый баланс: <strong>1000 баллов</strong>.</li>
+      <li>Минимальная ставка: <strong>10</strong>, максимальная: <strong>200</strong>.</li>
+      <li>Каждый спин: вы выбираете размер ставки и нажимаете красную кнопку <strong>«СПИН»</strong>.</li>
+      <li>Сессия длится <strong>ровно 15 минут</strong>, после чего игра автоматически завершится.</li>
+    </ul>
+
+    <p class="small muted">
+      Сначала вы заполните несколько коротких опросников, затем пройдёте тестовый блок (3 спина),
+      а после этого начнётся основная игровая сессия.
+    </p>
+
+    <button id="btnGoSurvey" class="btn-primary">Перейти к опросникам</button>
+  </div>
+
+  <!-- Экран 2: опросники -->
+  <div id="screen-survey" class="screen">
+    <h2>Опросники перед игрой</h2>
+    <p class="small muted">
+      Ниже приведены примерные вопросы. Для реального исследования замените текст пунктов на утверждения
+      из валидированных русскоязычных версий шкал (PGSI, импульсивность, DASS и т.п.).
+    </p>
+
+    <div class="scale-block">
+      <h4>PGSI — Проблемное азартное поведение (пример)</h4>
+      <div class="question">
+        <label for="pgsi_q1">1. За последний год вы играли на большие суммы, чем могли себе позволить?</label>
+        <select id="pgsi_q1">
+          <option value="">— выберите —</option>
+          <option value="0">0 — никогда</option>
+          <option value="1">1 — реже, чем раз в месяц</option>
+          <option value="2">2 — от 1 раза в месяц до 1 раза в неделю</option>
+          <option value="3">3 — чаще, чем раз в неделю</option>
+        </select>
+      </div>
+      <div class="question">
+        <label for="pgsi_q2">2. Бывали ли случаи, когда игра вызывала у вас проблемы (семейные, финансовые и др.)?</label>
+        <select id="pgsi_q2">
+          <option value="">— выберите —</option>
+          <option value="0">0 — никогда</option>
+          <option value="1">1 — иногда</option>
+          <option value="2">2 — часто</option>
+          <option value="3">3 — очень часто</option>
+        </select>
+      </div>
+      <div class="question">
+        <label for="pgsi_q3">3. Пытались ли вы вернуть проигранные деньги, продолжая играть?</label>
+        <select id="pgsi_q3">
+          <option value="">— выберите —</option>
+          <option value="0">0 — никогда</option>
+          <option value="1">1 — иногда</option>
+          <option value="2">2 — часто</option>
+          <option value="3">3 — очень часто</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="scale-block">
+      <h4>Импульсивность (BIS-11 / UPPS — пример)</h4>
+      <div class="question">
+        <label for="imp_q1">1. Мне сложно сдержаться, когда я хочу что-то сделать.</label>
+        <select id="imp_q1">
+          <option value="">— выберите —</option>
+          <option value="1">1 — совсем не про меня</option>
+          <option value="2">2 — скорее не про меня</option>
+          <option value="3">3 — скорее про меня</option>
+          <option value="4">4 — полностью про меня</option>
+        </select>
+      </div>
+      <div class="question">
+        <label for="imp_q2">2. Я часто делаю что-то, не обдумав последствия.</label>
+        <select id="imp_q2">
+          <option value="">— выберите —</option>
+          <option value="1">1 — совсем не про меня</option>
+          <option value="2">2 — скорее не про меня</option>
+          <option value="3">3 — скорее про меня</option>
+          <option value="4">4 — полностью про меня</option>
+        </select>
+      </div>
+      <div class="question">
+        <label for="imp_q3">3. Мне трудно остановиться, если я чем-то увлёкся(лась).</label>
+        <select id="imp_q3">
+          <option value="">— выберите —</option>
+          <option value="1">1 — совсем не про меня</option>
+          <option value="2">2 — скорее не про меня</option>
+          <option value="3">3 — скорее про меня</option>
+          <option value="4">4 — полностью про меня</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="scale-block">
+      <h4>Эмоциональное состояние (DASS-21 — пример)</h4>
+      <div class="question">
+        <label for="dass_q1">1. В последние дни я чувствую сильное напряжение или тревогу.</label>
+        <select id="dass_q1">
+          <option value="">— выберите —</option>
+          <option value="0">0 — почти никогда</option>
+          <option value="1">1 — иногда</option>
+          <option value="2">2 — часто</option>
+          <option value="3">3 — почти всегда</option>
+        </select>
+      </div>
+      <div class="question">
+        <label for="dass_q2">2. В последнее время мне трудно получать удовольствие от обычных занятий.</label>
+        <select id="dass_q2">
+          <option value="">— выберите —</option>
+          <option value="0">0 — почти никогда</option>
+          <option value="1">1 — иногда</option>
+          <option value="2">2 — часто</option>
+          <option value="3">3 — почти всегда</option>
+        </select>
+      </div>
+      <div class="question">
+        <label for="dass_q3">3. Я чувствую себя уставшим(ой) и истощённым(ой).</label>
+        <select id="dass_q3">
+          <option value="">— выберите —</option>
+          <option value="0">0 — почти никогда</option>
+          <option value="1">1 — иногда</option>
+          <option value="2">2 — часто</option>
+          <option value="3">3 — почти всегда</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="scale-block">
+      <h4>Текущее влечение к игре</h4>
+      <div class="question">
+        <label for="urge_now">Насколько сильно вы сейчас хотите играть (0–10)?</label>
+        <input type="number" id="urge_now" min="0" max="10" placeholder="0–10">
+      </div>
+    </div>
+
+    <div id="surveyError" class="error"></div>
+    <button id="btnSurveyNext" class="btn-primary">Сохранить ответы и перейти к тестовому раунду</button>
+  </div>
+
+  <!-- Экран 3: тестовый блок -->
+  <div id="screen-test" class="screen">
+    <h2>Тестовый раунд</h2>
+    <p>
+      Сейчас вы можете сделать несколько пробных ставок (до 3 спинов), чтобы привыкнуть к интерфейсу.
+      Эти результаты <strong>не</strong> войдут в основной файл.
+    </p>
+    <div>Тестовый баланс: <span id="testBalance">1000</span> баллов</div>
+    <div class="controls">
+      Ставка:
+      <input type="number" id="testStake" min="10" max="200" value="10">
+      <button id="btnTestSpin" class="btn-primary">СПИН (тест)</button>
+    </div>
+    <div id="testMessage" style="margin-top:10px"></div>
+    <p class="small muted">
+      После 3 тестовых раундов вы сможете перейти к основной части.
+    </p>
+    <button id="btnStartMain" disabled>Перейти к основной сессии</button>
+  </div>
+
+  <!-- Экран 4: основная сессия -->
+  <div id="screen-main" class="screen">
+    <h2>Основная игровая сессия</h2>
+    <div class="info-bar">
+      <span class="label">ID участника:</span> <span id="infoParticipantId"></span><br>
+      <span class="label">Оставшееся время:</span> <span id="timerDisplay">15:00</span><br>
+      <span class="label">Баланс:</span> <span id="balance">1000</span> баллов<br>
+      <span class="label">Номер раунда:</span> <span id="trialCounter">0</span>
+    </div>
+
+    <div id="slotFrame">
+      <div id="slotContainer">
+        <div class="reel" id="reel1">🍒</div>
+        <div class="reel" id="reel2">🍋</div>
+        <div class="reel" id="reel3">🔔</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      Ставка:
+      <input type="number" id="stake" min="10" max="200" value="10">
+      <button id="spin" class="btn-primary">СПИН</button>
+    </div>
+
+    <div id="message"></div>
+
+    <p class="small muted">
+      Вы можете остановить участие в любой момент, нажав кнопку ниже.
+    </p>
+    <button id="btnEndEarly">Завершить сессию досрочно</button>
+  </div>
+
+  <!-- Экран 5: завершение + сохранение -->
+  <div id="screen-end" class="screen">
+    <h2>Сессия завершена</h2>
+    <p id="endReason"></p>
+    <p>
+      Ниже вы можете сохранить файл с результатами в формате <strong>JSON</strong>.
+      Этот файл содержит информацию о каждом игровом раунде и ответы на опросники.
+    </p>
+    <button id="btnDownloadJson">Скачать результаты (.json)</button>
+    <p class="small muted">
+      Если нужно, вы можете передать этот файл исследователю или сохранить у себя.
+    </p>
+  </div>
+
+  <script>
+    // --------- Константы эксперимента ----------
+    const SESSION_DURATION_MS = 15 * 60 * 1000; // 15 минут
+    const INITIAL_BALANCE = 1000;
+    const MIN_STAKE = 10;
+    const MAX_STAKE = 200;
+
+    // --------- Состояние эксперимента ----------
+    let participantId = null;
+    let mainBalance = INITIAL_BALANCE;
+    let mainTrial = 0;
+    let sessionStartTime = null;
+    let sessionEndTime = null;
+    let sessionTimerId = null;
+    let sessionDeadline = null;
+    let lastReadyTime = null;
+    let logs = []; // данные по раундам
+    let surveyData = {}; // ответы опросников
+
+    // Для анимации слотов
+    const slotSymbols = ['🍒','🍋','🔔','⭐','7️⃣','🍉'];
+    let reelIntervals = [];
+    const SPIN_ANIMATION_DURATION = 800; // мс
+
+    // --------- Элементы DOM ----------
+    const screenIntro = document.getElementById('screen-intro');
+    const screenSurvey = document.getElementById('screen-survey');
+    const screenTest = document.getElementById('screen-test');
+    const screenMain = document.getElementById('screen-main');
+    const screenEnd = document.getElementById('screen-end');
+
+    const introError = document.getElementById('introError');
+    const participantIdInput = document.getElementById('participantIdInput');
+    const btnGoSurvey = document.getElementById('btnGoSurvey');
+
+    const surveyError = document.getElementById('surveyError');
+    const btnSurveyNext = document.getElementById('btnSurveyNext');
+
+    const testBalanceEl = document.getElementById('testBalance');
+    const testStakeEl = document.getElementById('testStake');
+    const btnTestSpin = document.getElementById('btnTestSpin');
+    const testMessage = document.getElementById('testMessage');
+    const btnStartMain = document.getElementById('btnStartMain');
+
+    const infoParticipantId = document.getElementById('infoParticipantId');
+    const timerDisplay = document.getElementById('timerDisplay');
+    const balanceEl = document.getElementById('balance');
+    const stakeEl = document.getElementById('stake');
+    const spinBtn = document.getElementById('spin');
+    const message = document.getElementById('message');
+    const trialCounterEl = document.getElementById('trialCounter');
+    const btnEndEarly = document.getElementById('btnEndEarly');
+
+    const screenEndReason = document.getElementById('endReason');
+    const btnDownloadJson = document.getElementById('btnDownloadJson');
+
+    const reel1 = document.getElementById('reel1');
+    const reel2 = document.getElementById('reel2');
+    const reel3 = document.getElementById('reel3');
+
+    // --------- Хэлперы для экранов ----------
+    function showScreen(screen){
+      [screenIntro, screenSurvey, screenTest, screenMain, screenEnd].forEach(s => s.classList.remove('active'));
+      screen.classList.add('active');
+    }
+
+    // --------- Переход к опросникам ----------
+    btnGoSurvey.addEventListener('click', () => {
+      const id = participantIdInput.value.trim();
+      if(!id){
+        introError.textContent = 'Пожалуйста, введите идентификатор участника.';
+        return;
+      }
+      introError.textContent = '';
+      participantId = id;
+      showScreen(screenSurvey);
+    });
+
+    // --------- Сбор ответов опросников ----------
+    btnSurveyNext.addEventListener('click', () => {
+      // Собираем значения
+      const pgsi_q1 = document.getElementById('pgsi_q1').value;
+      const pgsi_q2 = document.getElementById('pgsi_q2').value;
+      const pgsi_q3 = document.getElementById('pgsi_q3').value;
+
+      const imp_q1 = document.getElementById('imp_q1').value;
+      const imp_q2 = document.getElementById('imp_q2').value;
+      const imp_q3 = document.getElementById('imp_q3').value;
+
+      const dass_q1 = document.getElementById('dass_q1').value;
+      const dass_q2 = document.getElementById('dass_q2').value;
+      const dass_q3 = document.getElementById('dass_q3').value;
+
+      const urge_now_str = document.getElementById('urge_now').value;
+
+      // Простейшая проверка на заполненность
+      const fields = [pgsi_q1, pgsi_q2, pgsi_q3,
+                      imp_q1, imp_q2, imp_q3,
+                      dass_q1, dass_q2, dass_q3,
+                      urge_now_str];
+
+      if(fields.some(v => v === '')){
+        surveyError.textContent = 'Пожалуйста, ответьте на все вопросы перед продолжением.';
+        return;
+      }
+      const urge_now = Number(urge_now_str);
+      if(isNaN(urge_now) || urge_now < 0 || urge_now > 10){
+        surveyError.textContent = 'Пожалуйста, введите уровень влечения к игре от 0 до 10.';
+        return;
+      }
+
+      surveyError.textContent = '';
+
+      surveyData = {
+        pgsi_example: {
+          q1: Number(pgsi_q1),
+          q2: Number(pgsi_q2),
+          q3: Number(pgsi_q3)
+        },
+        impulsivity_example: {
+          q1: Number(imp_q1),
+          q2: Number(imp_q2),
+          q3: Number(imp_q3)
+        },
+        dass_example: {
+          q1: Number(dass_q1),
+          q2: Number(dass_q2),
+          q3: Number(dass_q3)
+        },
+        urge_now: urge_now
+      };
+
+      // Инициализируем тестовый блок
+      testBalance = INITIAL_BALANCE;
+      testTrials = 0;
+      testBalanceEl.textContent = testBalance;
+      testMessage.textContent = '';
+      btnStartMain.disabled = true;
+
+      showScreen(screenTest);
+    });
+
+    // --------- Тестовый блок ----------
+    let testBalance = INITIAL_BALANCE;
+    let testTrials = 0;
+    const MAX_TEST_TRIALS = 3;
+
+    btnTestSpin.addEventListener('click', () => {
+      const stake = Number(testStakeEl.value);
+      if(stake < MIN_STAKE || stake > MAX_STAKE){
+        alert(`Ставка должна быть от ${MIN_STAKE} до ${MAX_STAKE}.`);
+        return;
+      }
+      if(stake > testBalance){
+        alert('Ставка не может превышать текущий баланс.');
+        return;
+      }
+
+      const r = Math.random();
+      let outcome = -stake;
+      if(r < 0.01){
+        outcome = stake * 100 - stake;
+      } else if(r < 0.10){
+        outcome = stake * 5 - stake;
+      }
+      testBalance += outcome;
+      testTrials += 1;
+      testBalanceEl.textContent = testBalance;
+
+      testMessage.textContent =
+        `Тестовый раунд ${testTrials}: результат ${outcome >= 0 ? '+'+outcome : outcome} (баланс ${testBalance}).`;
+
+      if(testTrials >= MAX_TEST_TRIALS){
+        btnStartMain.disabled = false;
+        testMessage.textContent += ' Тест завершён. Можно переходить к основной сессии.';
+      }
+    });
+
+    btnStartMain.addEventListener('click', () => {
+      // Инициализируем основную сессию
+      mainBalance = INITIAL_BALANCE;
+      mainTrial = 0;
+      logs = [];
+      sessionStartTime = new Date();
+      sessionDeadline = sessionStartTime.getTime() + SESSION_DURATION_MS;
+      balanceEl.textContent = mainBalance;
+      trialCounterEl.textContent = mainTrial.toString();
+      infoParticipantId.textContent = participantId;
+      message.textContent = '';
+      lastReadyTime = performance.now();
+
+      startSessionTimer();
+      showScreen(screenMain);
+    });
+
+    // --------- Таймер сессии ----------
+    function startSessionTimer(){
+      updateTimerDisplay();
+      sessionTimerId = setInterval(() => {
+        const now = Date.now();
+        if(now >= sessionDeadline){
+          endSession('Время сессии истекло (15 минут).');
+        } else {
+          updateTimerDisplay();
+        }
+      }, 1000);
+    }
+
+    function updateTimerDisplay(){
+      const now = Date.now();
+      let remaining = Math.max(0, sessionDeadline - now);
+      const totalSeconds = Math.floor(remaining / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      timerDisplay.textContent =
+        String(minutes).padStart(2,'0') + ':' + String(seconds).padStart(2,'0');
+    }
+
+    // --------- Анимация слотов ----------
+    function startReelAnimation(){
+      const reels = [reel1, reel2, reel3];
+      reelIntervals = reels.map(reel => {
+        return setInterval(() => {
+          const sym = slotSymbols[Math.floor(Math.random() * slotSymbols.length)];
+          reel.textContent = sym;
+        }, 80 + Math.random()*40);
+      });
+    }
+
+    function stopReelAnimation(){
+      reelIntervals.forEach(id => clearInterval(id));
+      reelIntervals = [];
+      // зафиксируем случайные символы в конце
+      [reel1, reel2, reel3].forEach(reel => {
+        const sym = slotSymbols[Math.floor(Math.random() * slotSymbols.length)];
+        reel.textContent = sym;
+      });
+    }
+
+    // --------- Основной игровой спин ----------
+    spinBtn.addEventListener('click', () => {
+      const now = Date.now();
+      if(now >= sessionDeadline){
+        endSession('Время сессии истекло (15 минут).');
+        return;
+      }
+
+      const stake = Number(stakeEl.value);
+      if(stake < MIN_STAKE || stake > MAX_STAKE){
+        alert(`Ставка должна быть от ${MIN_STAKE} до ${MAX_STAKE}.`);
+        return;
+      }
+      if(stake > mainBalance){
+        alert('Ставка не может превышать текущий баланс.');
+        return;
+      }
+
+      // Блокируем кнопку на время анимации
+      spinBtn.disabled = true;
+
+      const nowPerf = performance.now();
+      const reactionTime = lastReadyTime ? (nowPerf - lastReadyTime) : null;
+
+      // Сразу определяем исход, а визуал — просто оформление
+      const r = Math.random();
+      let outcome = -stake;
+      if(r < 0.01){
+        outcome = stake * 100 - stake;
+      } else if(r < 0.10){
+        outcome = stake * 5 - stake;
+      }
+
+      startReelAnimation();
+
+      setTimeout(() => {
+        stopReelAnimation();
+
+        mainBalance += outcome;
+        mainTrial += 1;
+        balanceEl.textContent = mainBalance;
+        trialCounterEl.textContent = mainTrial.toString();
+
+        const trialInfo = {
+          participant_id: participantId,
+          timestamp: new Date().toISOString(),
+          trial_number: mainTrial,
+          stake_amount: stake,
+          outcome_amount: outcome,
+          balance_after: mainBalance,
+          reaction_time_ms: reactionTime
+        };
+        logs.push(trialInfo);
+
+        message.textContent =
+          `Раунд ${mainTrial}: результат ${outcome >= 0 ? '+'+outcome : outcome} (баланс ${mainBalance}).`;
+
+        if(mainBalance < MIN_STAKE){
+          endSession('Баланс стал меньше минимальной ставки. Сессия завершена.');
+          return;
+        }
+
+        lastReadyTime = performance.now();
+        spinBtn.disabled = false;
+      }, SPIN_ANIMATION_DURATION);
+    });
+
+    // --------- Досрочное завершение ----------
+    btnEndEarly.addEventListener('click', () => {
+      const confirmEnd = confirm('Вы уверены, что хотите досрочно завершить сессию?');
+      if(confirmEnd){
+        endSession('Сессия завершена участником досрочно.');
+      }
+    });
+
+    // --------- Завершение сессии ----------
+    function endSession(reasonText){
+      if(sessionTimerId){
+        clearInterval(sessionTimerId);
+        sessionTimerId = null;
+      }
+      sessionEndTime = new Date();
+
+      screenEndReason.textContent = reasonText;
+      showScreen(screenEnd);
+    }
+
+    // --------- Скачивание JSON ----------
+    btnDownloadJson.addEventListener('click', () => {
+      const data = {
+        meta: {
+          participant_id: participantId,
+          session_start: sessionStartTime ? sessionStartTime.toISOString() : null,
+          session_end: sessionEndTime ? sessionEndTime.toISOString() : null,
+          initial_balance: INITIAL_BALANCE,
+          min_stake: MIN_STAKE,
+          max_stake: MAX_STAKE,
+          model_description: 'джекпот 1% x100; маленький выигрыш 9% x5; остальное проигрыш',
+          total_trials: mainTrial
+        },
+        survey: surveyData,
+        trials: logs
+      };
+
+      const jsonStr = JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonStr], {type: 'application/json'});
+      const url = URL.createObjectURL(blob);
+
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      const safeId = (participantId || 'participant').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const filename = `gambling_sim_${safeId}_${ts}.json`;
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
+</html>
